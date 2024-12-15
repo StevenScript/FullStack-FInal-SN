@@ -45,9 +45,47 @@ app.get("/", async (request, response) => {
   response.render("index/unauthenticatedIndex", {});
 });
 
-app.get("/login", async (request, response) => {});
+// Route to render login page
+app.get("/login", (req, res) => {
+  // Check if the user is already logged verifying if a user ID exists in the session
+  if (req.session.user?.id) return res.redirect("/dashboard"); // Redirect to dashboard if logged in
+  return res.render("login", { errorMessage: null }); // Render the login page with no error message
+});
 
-app.post("/login", async (request, response) => {});
+// Route to handle login form submission
+app.post("/login", async (req, res) => {
+  // Destructure username and password from the request body
+  const { username, password } = req.body;
+  try {
+    // Find the user in the database using the provided username
+    const user = await User.findOne({ username });
+    if (!user) {
+      // If the user does not exist, render the login page with an error message
+      return res.render("login", {
+        errorMessage: "Invalid username or password",
+      });
+    }
+
+    // Compare the provided password with the stored hashed password using bcrypt
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!validPassword) {
+      // If the password is incorrect, render the login page with an error message
+      return res.render("login", {
+        errorMessage: "Invalid username or password",
+      });
+    }
+
+    // Valid user: set the user session with user ID and username
+    req.session.user = { id: user._id, username: user.username };
+    // Redirect the user to the dashboard upon successful login
+    return res.redirect("/dashboard");
+  } catch (error) {
+    // Log any errors encountered during the login process for debugging
+    console.error(error);
+    // Render the login page with a generic error message
+    return res.render("login", { errorMessage: "Error logging in" });
+  }
+});
 
 app.get("/signup", async (request, response) => {
   if (request.session.user?.id) {
