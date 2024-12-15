@@ -87,12 +87,6 @@ function onVoteClicked(event) {
   const pollId = formData.get("poll-id");
   const selectedOption = event.submitter.value;
   const userId = window.USER_ID;
-  socket.send(
-    JSON.stringify({
-      event: "new-vote",
-      data: { pollId, selectedOption, userId },
-    })
-  );
 
   // Tell the server the user voted
   socket.send(

@@ -85,8 +85,14 @@ app.get("/", async (req, res) => {
   if (req.session.user?.id) {
     return res.redirect("/dashboard");
   }
+  // Count the number of polls in the database
+  const pollCount = await Poll.countDocuments({});
+
   // Pass session
-  res.render("index/unauthenticatedIndex", { session: req.session });
+  res.render("index/unauthenticatedIndex", {
+    session: req.session,
+    pollCount: pollCount,
+  });
 });
 
 // Route to render login page
