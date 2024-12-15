@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   passwordHash: { type: String, required: true },
+  votedPolls: [{ type: mongoose.Schema.Types.ObjectId, ref: "Poll" }],
 });
 
 // Exporting the User model to be used in other parts of the application.
