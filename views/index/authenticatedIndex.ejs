@@ -1,5 +1,5 @@
 <script>
-  window.USER_ID = "<%= request.session.user.id %>";
+  window.USER_ID = "<%= session.user.id %>";
 </script>
 <%- include('../partials/header', { session: session }) %>
 <div class="main-content">
