@@ -150,17 +150,73 @@ app.get("/createPoll", async (request, response) => {
   return response.render("createPoll");
 });
 
-// Poll creation
+// Poll creation route
 app.post("/createPoll", async (request, response) => {
+  // Check if the user is authenticated
+  if (!request.session.user?.id) {
+    return response.redirect("/"); // Redirect unauthentic users home
+  }
   const { question, options } = request.body;
+
+  // Formatting options into the structure required by the Poll model
+  // Each option includes an answer and initializes votes to 0
   const formattedOptions = Object.values(options).map((option) => ({
     answer: option,
     votes: 0,
   }));
 
-  const pollCreationError = onCreateNewPoll(question, formattedOptions);
-  //TODO: If an error occurs, what should we do?
+  // Call the helper function to handle poll creation and check for errors
+  const pollCreationError = await onCreateNewPoll(
+    question,
+    formattedOptions,
+    request.session.user.id
+  );
+  if (pollCreationError) {
+    // If an error occurs, re-render the poll creation page with an error message
+    return response.render("createPoll", {
+      errorMessage: pollCreationError,
+      request,
+    });
+  }
+
+  // Redirect to the dashboard upon successful poll creation
+  return response.redirect("/dashboard");
 });
+
+// Helper function for creating a new poll
+async function onCreateNewPoll(question, pollOptions, userId) {
+  try {
+    // Create a new Poll object with the provided data
+    const newPoll = new Poll({
+      question,
+      options: pollOptions,
+      createdBy: userId,
+    });
+    // Save the new poll to the database
+    await newPoll.save();
+
+    // Notify all connected WebSockets about the new poll
+    for (const client of connectedClients) {
+      client.send(
+        JSON.stringify({
+          event: "new-poll",
+          data: {
+            id: newPoll._id,
+            question: newPoll.question,
+            options: newPoll.options,
+          },
+        })
+      );
+    }
+
+    // Return null for successful poll creation
+    return null;
+  } catch (error) {
+    console.error(error);
+    // Error message to be displayed to the user
+    return "Error creating the poll, please try again";
+  }
+}
 
 // Logout route
 app.get("/logout", (req, res) => {
