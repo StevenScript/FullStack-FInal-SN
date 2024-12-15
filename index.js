@@ -43,8 +43,8 @@ app.ws("/ws", (socket, request) => {
 
   async function onNewVote(pollId, selectedOption, userId) {
     try {
-      const poll = await poll.findById(pollId);
-      const user = await user.findById(userId);
+      const poll = await Poll.findById(pollId);
+      const user = await User.findById(userId);
 
       if (!poll || !user) return;
 
@@ -76,6 +76,38 @@ app.ws("/ws", (socket, request) => {
     connectedClients = connectedClients.filter((c) => c !== socket);
   });
 });
+
+async function onNewVote(pollId, selectedOption, userId) {
+  try {
+    const poll = await Poll.findById(pollId);
+    const user = await User.findById(userId);
+
+    if (!poll || !user) return;
+
+    const option = poll.options.find((opt) => opt.answer === selectedOption);
+    if (option) {
+      option.votes++;
+      await poll.save();
+
+      // Record user voted poll if not already
+      if (!user.votedPolls.includes(pollId)) {
+        user.votedPolls.push(pollId);
+        await user.save();
+      }
+
+      for (const client of connectedClients) {
+        client.send(
+          JSON.stringify({
+            event: "vote-updated",
+            data: { pollId: poll._id, options: poll.options },
+          })
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error updating poll:", error);
+  }
+}
 
 app.get("/", async (request, response) => {
   if (request.session.user?.id) {
