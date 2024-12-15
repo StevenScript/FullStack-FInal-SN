@@ -1,3 +1,6 @@
+<script>
+  window.USER_ID = "<%= request.session.user.id %>";
+</script>
 <%- include('../partials/header', { session: request.session }) %>
 <div class="main-content">
     <h1>Active Polls</h1>

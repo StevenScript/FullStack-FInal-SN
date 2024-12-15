@@ -32,9 +32,49 @@ app.ws("/ws", (socket, request) => {
 
   socket.on("message", async (message) => {
     const data = JSON.parse(message);
+    if (data.event === "new-vote") {
+      await onNewVote(
+        data.data.pollId,
+        data.data.selectedOption,
+        data.data.userId
+      );
+    }
   });
 
-  socket.on("close", async (message) => {});
+  async function onNewVote(pollId, selectedOption, userId) {
+    try {
+      const poll = await poll.findById(pollId);
+      const user = await user.findById(userId);
+
+      if (!poll || !user) return;
+
+      const option = poll.options.find((opt) => opt.answer === selectedOption);
+      if (option) {
+        option.votes++;
+        await poll.save();
+
+        // Record user voted poll if not already
+        if (!user.votedPolls.includes(pollId)) {
+          user.votedPolls.push(pollId);
+          await user.save();
+        }
+
+        for (const client of connectedClients) {
+          client.send(
+            JSON.stringify({
+              event: "vote-updated",
+              data: { pollId: poll._id, options: poll.options },
+            })
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error updating poll:", error);
+    }
+  }
+  socket.on("close", async (message) => {
+    connectedClients = connectedClients.filter((c) => c !== socket);
+  });
 });
 
 app.get("/", async (request, response) => {
