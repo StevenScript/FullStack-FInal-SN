@@ -125,14 +125,19 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+// Route for the dashboard, accessible only to authenticated users
 app.get("/dashboard", async (request, response) => {
+  // Checking if the user is logged in by verifying the presence of a user ID in the session
   if (!request.session.user?.id) {
-    return response.redirect("/");
+    return response.redirect("/"); // send unauthentic users to the homepage
   }
 
-  //TODO: Fix the polls, this should contain all polls that are active. I'd recommend taking a look at the
-  //authenticatedIndex template to see how it expects polls to be represented
-  return response.render("index/authenticatedIndex", { polls: [] });
+  // Retrieving all polls from the database using the polls model
+  const polls = await polls.find({});
+
+  // Rendering the authenticated dashboard page with the retrieved polls
+  // Passing the polls data and request object to the view for dynamic content generation
+  return response.render("index/authenticatedIndex", { polls, request });
 });
 
 app.get("/profile", async (request, response) => {});
