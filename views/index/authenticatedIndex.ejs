@@ -7,6 +7,7 @@
     <% if (polls.length === 0) { %>
         <p>No polls available. <a href="/createPoll">Create one?</a></p>
     <% } else { %>
+        <a href="/createPoll" class="action-button">Create a New Poll</a>
         <ul id="polls">
             <% polls.forEach((poll) => { %>
                 <li class="poll-container" id="<%= poll._id %>">
