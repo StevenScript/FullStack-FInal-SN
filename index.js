@@ -157,6 +157,15 @@ app.post("/createPoll", async (request, response) => {
   //TODO: If an error occurs, what should we do?
 });
 
+// Logout route
+app.get("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    // Destroying the current session and log any error
+    if (err) console.error(err);
+    return res.redirect("/"); // Redirecting to the homepage
+  });
+});
+
 mongoose
   .connect(MONGO_URI)
   .then(() =>
