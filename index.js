@@ -8,15 +8,15 @@ const User = require("./models/User");
 const Poll = require("./models/Polls");
 
 const PORT = 3000;
-//TODO: Update this URI to match your own MongoDB setup
-const MONGO_URI = "mongodb://localhost:27017/keyin_test";
+const MONGO_URI = "mongodb://localhost:27017/keyin_test"; // kept as default
 
 const app = express();
 expressWs(app);
 
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"))); // Serve static files
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 app.use(
@@ -28,13 +28,14 @@ app.use(
 );
 let connectedClients = [];
 
-//Note: Not all routes you need are present here, some are missing and you'll need to add them yourself.
-
+// WebSocket endpoint for real-time events
 app.ws("/ws", (socket, req) => {
   connectedClients.push(socket);
 
   socket.on("message", async (message) => {
     const data = JSON.parse(message);
+
+    // Handle incoming vote events
     if (data.event === "new-vote") {
       await onNewVote(
         data.data.pollId,
@@ -49,7 +50,7 @@ app.ws("/ws", (socket, req) => {
   });
 });
 
-//Handle a new vote on a poll
+// Handle a new vote on a poll, update the database, and notify all clients
 async function onNewVote(pollId, selectedOption, userId) {
   try {
     const poll = await Poll.findById(pollId);
@@ -62,11 +63,13 @@ async function onNewVote(pollId, selectedOption, userId) {
       option.votes++;
       await poll.save();
 
+      // Track that this user voted on this poll if not already recorded
       if (!user.votedPolls.includes(pollId)) {
         user.votedPolls.push(pollId);
         await user.save();
       }
 
+      // Broadcast updated poll results to all connected clients
       for (const client of connectedClients) {
         client.send(
           JSON.stringify({
@@ -81,28 +84,28 @@ async function onNewVote(pollId, selectedOption, userId) {
   }
 }
 
+// Home page: If logged in, redirect to dashboard, else show sign-up/login options
+// Also displays the current number of polls
 app.get("/", async (req, res) => {
   if (req.session.user?.id) {
     return res.redirect("/dashboard");
   }
   // Count the number of polls in the database
   const pollCount = await Poll.countDocuments({});
-
-  // Pass session
   res.render("index/unauthenticatedIndex", {
     session: req.session,
     pollCount: pollCount,
   });
 });
 
-// Route to render login page
+// Login page: If user is already logged in, go to dashboard; else show the login form
 app.get("/login", (req, res) => {
   // Check if the user is already logged in by verifying if a user ID exists in the session
   if (req.session.user?.id) return res.redirect("/dashboard"); // Redirect to dashboard if logged in
   return res.render("login", { errorMessage: null, session: req.session }); // Render the login page with no error message
 });
 
-// Route to handle login form submission
+// Handle login form submission: authenticate user and set session
 app.post("/login", async (req, res) => {
   // Destructure username and password from the request body
   const { username, password } = req.body;
@@ -142,6 +145,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// Signup page: If logged in, redirect to dashboard; else show signup form
 app.get("/signup", async (req, res) => {
   if (req.session.user?.id) {
     return res.redirect("/dashboard");
@@ -153,7 +157,7 @@ app.get("/signup", async (req, res) => {
   });
 });
 
-// Handles user signup
+// Handle signup form submission: create a new user, hash password, and set session
 app.post("/signup", async (req, res) => {
   // Destructure username and password from the request body
   const { username, password } = req.body;
@@ -187,23 +191,22 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// Route for the dashboard, accessible only to authenticated users
+// Dashboard: Only accessible to authenticated users.
+// Shows all polls and allows poll creation and voting.
 app.get("/dashboard", async (req, res) => {
   // Checking if the user is logged in by verifying the presence of a user ID in the session
   if (!req.session.user?.id) {
-    return res.redirect("/"); // send unauthentic users to the homepage
+    return res.redirect("/");
   }
-
-  // Retrieving all polls from the database using the Poll model
   const polls = await Poll.find({});
-
-  // Rendering the authenticated dashboard page with the retrieved polls
   return res.render("index/authenticatedIndex", {
     polls,
     session: req.session,
   });
 });
 
+// Profile page: Only for authenticated users.
+// Displays username and how many polls they've voted in.
 app.get("/profile", async (req, res) => {
   if (!req.session.user?.id) {
     return res.redirect("/");
@@ -220,6 +223,7 @@ app.get("/profile", async (req, res) => {
   });
 });
 
+// Create Poll page: Only for logged-in users
 app.get("/createPoll", async (req, res) => {
   if (!req.session.user?.id) {
     return res.redirect("/");
@@ -228,40 +232,32 @@ app.get("/createPoll", async (req, res) => {
   return res.render("createPoll", { session: req.session });
 });
 
-// Poll creation route
+// Handle poll creation form: save a new poll to the database, notify clients
 app.post("/createPoll", async (req, res) => {
-  // Check if the user is authenticated
   if (!req.session.user?.id) {
-    return res.redirect("/"); // Redirect unauthentic users home
+    return res.redirect("/");
   }
   const { question, options } = req.body;
-
-  // Formatting options into the structure required by the Poll model
-  // Each option includes an answer and initializes votes to 0
   const formattedOptions = Object.values(options).map((option) => ({
     answer: option,
     votes: 0,
   }));
 
-  // Call the helper function to handle poll creation and check for errors
   const pollCreationError = await onCreateNewPoll(
     question,
     formattedOptions,
     req.session.user.id
   );
   if (pollCreationError) {
-    // If an error occurs, re-render the poll creation page with an error message
     return res.render("createPoll", {
       errorMessage: pollCreationError,
       session: req.session,
     });
   }
-
-  // Redirect to the dashboard upon successful poll creation
   return res.redirect("/dashboard");
 });
 
-// Helper function for creating a new poll
+// Helper function: creates a new poll and broadcasts to connected clients
 async function onCreateNewPoll(question, pollOptions, userId) {
   try {
     // Create a new Poll object with the provided data
@@ -273,7 +269,7 @@ async function onCreateNewPoll(question, pollOptions, userId) {
     // Save the new poll to the database
     await newPoll.save();
 
-    // Notify all connected WebSockets about the new poll
+    // Broadcast new poll to all clients
     for (const client of connectedClients) {
       client.send(
         JSON.stringify({
@@ -287,24 +283,22 @@ async function onCreateNewPoll(question, pollOptions, userId) {
       );
     }
 
-    // Return null for successful poll creation
     return null;
   } catch (error) {
     console.error(error);
-    // Error message to be displayed to the user
     return "Error creating the poll, please try again";
   }
 }
 
-// Logout route
+// Logout: Destroy session and return to home page
 app.get("/logout", (req, res) => {
   req.session.destroy((err) => {
-    // Destroying the current session and log any error
     if (err) console.error(err);
-    return res.redirect("/"); // Redirecting to the homepage
+    return res.redirect("/");
   });
 });
 
+// Connect to MongoDB and start the server
 mongoose
   .connect(MONGO_URI)
   .then(() =>
