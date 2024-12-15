@@ -1,38 +1,45 @@
 <script>
-  window.USER_ID = "<%= session.user.id %>";
-</script>
-<%- include('../partials/header', { session: session }) %>
-<div class="main-content">
-    <h1>Active Polls</h1>
-    <% if (polls.length === 0) { %>
-        <p>No polls available. <a href="/createPoll">Create one?</a></p>
-    <% } else { %>
-        <a href="/createPoll" class="action-button">Create a New Poll</a>
-        <ul id="polls">
-            <% polls.forEach((poll) => { %>
-                <li class="poll-container" id="<%= poll._id %>">
-                    <h2><%= poll.question %></h2>
-                    <ul class="poll-options">
-                        <% for (let {answer, votes } of poll.options) { %>
-                            <li id="<%= poll._id %>_<%= answer %>">
-                                <strong><%= answer %>:</strong> <%= votes %> votes
-                            </li>
-                        <% } %>
-                    </ul>
-                    <form class="poll-form button-container">
-                        <% for (let { answer } of poll.options) { %>
-                            <button class="action-button vote-button" type="submit" value="<%= answer %>" name="poll-option">
-                                Vote for <%= answer %>
-                            </button>
-                        <% } %>
-                        <input type="text" style="display: none;" value="<%= poll._id %>" name="poll-id"/>
-                    </form>
-                </li>
-            <% }) %>
-        </ul>
-    <% } %>
-</div>
-<script src="/frontend.js" type="application/javascript"></script>
-</body>
-</html>
+    window.USER_ID = "<%= session.user.id %>";
+  </script>
+  <%- include('../partials/header', { session: session }) %>
+  <div class="main-content">
+      <h1>Active Polls</h1>
+      <a href="/createPoll" class="action-button">Create a New Poll</a>
+      <% if (polls.length === 0) { %>
+          <p>No polls available. Why not create one?</p>
+      <% } else { %>
+          <ul id="polls">
+              <% polls.forEach((poll) => { %>
+                  <li class="poll-container" id="<%= poll._id %>">
+                      <h2><%= poll.question %></h2>
+                      <ul class="poll-options">
+                          <% for (let {answer, votes } of poll.options) { %>
+                              <li id="<%= poll._id %>_<%= answer %>">
+                                  <strong><%= answer %>:</strong> <%= votes %> votes
+                              </li>
+                          <% } %>
+                      </ul>
+                      <form class="poll-form button-container" style="display:inline-block; margin-right:10px;">
+                          <% for (let { answer } of poll.options) { %>
+                              <button class="action-button vote-button" type="submit" value="<%= answer %>" name="poll-option">
+                                  Vote for <%= answer %>
+                              </button>
+                          <% } %>
+                          <input type="hidden" value="<%= poll._id %>" name="poll-id"/>
+                      </form>
+  
+                      <% // If the logged-in user created this poll, show a delete button %>
+                      <% if (session.user && String(poll.createdBy) === String(session.user.id)) { %>
+                          <form action="/polls/<%= poll._id %>/delete" method="POST" style="display:inline-block;">
+                              <button type="submit" class="action-button danger">Delete</button>
+                          </form>
+                      <% } %>
+                  </li>
+              <% }) %>
+          </ul>
+      <% } %>
+  </div>
+  <script src="/frontend.js" type="application/javascript"></script>
+  </body>
+  </html>
 
